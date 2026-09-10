@@ -89,7 +89,7 @@ Laravel Framework 12.65.0
 
 ---
 
-## 4. Planned Technology Stack
+## 4. Technology Stack
 
 ### Backend
 
@@ -103,22 +103,33 @@ Laravel Framework 12.65.0
 ### Frontend
 
 - Laravel Blade
-- Livewire
-- Tailwind CSS
+- Livewire 4.4.0
+- Tailwind CSS 4
+- Vite
 - JavaScript / Alpine.js where appropriate
+
+### Authentication
+
+Authentication work has started using:
+
+- Laravel Fortify 1.38.0
+- Livewire 4.4.0
+
+Fortify is currently installed locally but has **not yet been committed or pushed**.
 
 ### Development
 
 - Laragon
 - VS Code
 - Chrome
-- Node.js / npm for frontend tooling
+- Node.js / npm
+- Git / GitHub
 
 We are intentionally avoiding a separate React frontend and separate API backend for the initial version.
 
 ---
 
-## 5. Planned Application Structure
+## 5. Application Structure
 
 Initial application flow:
 
@@ -139,9 +150,9 @@ Dashboard
 
 ---
 
-## 6. Planned Database
+## 6. Database
 
-Initial tables:
+Initial application tables:
 
 ```text
 users
@@ -149,6 +160,8 @@ accounts
 categories
 transactions
 ```
+
+Laravel framework tables are also present, including the migration, cache, jobs, and session-related tables created by the default Laravel migrations.
 
 Potential future tables:
 
@@ -206,7 +219,7 @@ CREDIT_CARD
 OTHER
 ```
 
-We plan to use an opening balance plus transactions to determine the current balance rather than making the current balance a separate source of truth.
+We use an opening balance plus transactions to determine the current balance rather than making the current balance a separate source of truth.
 
 Conceptually:
 
@@ -219,9 +232,69 @@ Opening Balance
 = Current Balance
 ```
 
+### `accounts` table
+
+Current fields:
+
+```text
+id
+user_id
+name
+type
+opening_balance
+currency
+is_active
+timestamps
+```
+
+The `user_id` foreign key uses cascade deletion.
+
 ---
 
-## 8. Transaction Concept
+## 8. Category Concept
+
+Categories classify income and expenses.
+
+Examples:
+
+```text
+Income
+├── Salary
+├── Freelance
+└── Bonus
+
+Expense
+├── Food
+├── Transport
+├── Housing
+└── Utilities
+```
+
+### `categories` table
+
+Current fields:
+
+```text
+id
+user_id
+name
+type
+is_active
+timestamps
+```
+
+Category types currently planned:
+
+```text
+INCOME
+EXPENSE
+```
+
+Categories are user-owned.
+
+---
+
+## 9. Transaction Concept
 
 Initial transaction types:
 
@@ -247,9 +320,9 @@ Maybank
 Expense → Food
 ```
 
-Transfers should not be counted as expenses.
+Transfers are not counted as expenses.
 
-A transfer between accounts will eventually be represented by two linked transaction records:
+A transfer between accounts is represented by two linked transaction records:
 
 ```text
 Maybank
@@ -263,11 +336,208 @@ Savings
 
 Both records share a transfer identifier.
 
+### `transactions` table
+
+Current fields:
+
+```text
+id
+user_id
+account_id
+category_id
+type
+amount
+transaction_date
+description
+transfer_id
+timestamps
+```
+
+### Transaction rules
+
+Amounts are stored as positive values.
+
+```text
+INCOME   → amount = positive
+EXPENSE  → amount = positive
+TRANSFER → amount = positive
+```
+
+The transaction type and transfer direction determine how the amount affects the account balance.
+
+Planned application rules:
+
+```text
+INCOME   → category required
+EXPENSE  → category required
+TRANSFER → category normally null
+amount   → must be greater than zero
+```
+
+Transfers use a nullable UUID `transfer_id` shared by the two sides of the transfer.
+
+The transaction migration uses:
+
+```text
+account_id  → restrictOnDelete
+category_id → nullOnDelete
+```
+
+This protects financial history when accounts are deleted and preserves transactions if a category is removed.
+
 ---
 
-## 9. Planned Dashboard
+## 10. Current Eloquent Models
 
-The initial dashboard should provide:
+Created models:
+
+```text
+app/Models/Account.php
+app/Models/Category.php
+app/Models/Transaction.php
+```
+
+`User.php` has been updated with:
+
+```text
+accounts()
+categories()
+transactions()
+```
+
+### Relationships
+
+```text
+User
+ ├── hasMany(Account)
+ ├── hasMany(Category)
+ └── hasMany(Transaction)
+
+Account
+ ├── belongsTo(User)
+ └── hasMany(Transaction)
+
+Category
+ ├── belongsTo(User)
+ └── hasMany(Transaction)
+
+Transaction
+ ├── belongsTo(User)
+ ├── belongsTo(Account)
+ └── belongsTo(Category)
+```
+
+The models were verified successfully with Laravel Tinker.
+
+Current record counts:
+
+```text
+User::count()        → 0
+Account::count()     → 0
+Category::count()    → 0
+Transaction::count() → 0
+```
+
+No test financial records have been inserted.
+
+---
+
+## 11. Git / GitHub
+
+Repository:
+
+```text
+https://github.com/hafizin9511/finora
+```
+
+Current branch:
+
+```text
+main
+```
+
+GitHub remote:
+
+```text
+origin
+```
+
+`.env` is correctly ignored by Git:
+
+```text
+.gitignore:3:.env
+```
+
+### Git checkpoints
+
+Current Git history includes:
+
+```text
+b2b51f3 — Add Finora financial data models and migrations
+8d46b73 — Install Livewire
+```
+
+The latest GitHub checkpoint is:
+
+```text
+8d46b73 — Install Livewire
+```
+
+### Current uncommitted local changes
+
+Laravel Fortify has been installed locally.
+
+Current uncommitted changes are:
+
+```text
+composer.json
+composer.lock
+```
+
+Fortify has **not yet been committed or pushed**.
+
+The intended next checkpoint commit is:
+
+```text
+Install Laravel Fortify
+```
+
+Do not assume this commit exists until Git confirms it.
+
+---
+
+## 12. Authentication Progress
+
+Authentication scaffolding is currently being prepared.
+
+Installed locally:
+
+```text
+Livewire 4.4.0
+Laravel Fortify 1.38.0
+```
+
+Fortify installation brought in authentication-related dependencies, including Laravel Passkeys and supporting WebAuthn/2FA packages.
+
+No authentication routes, views, or Fortify configuration have been intentionally configured yet.
+
+### Important
+
+Do not run:
+
+```text
+laravel new
+```
+
+inside the existing Finora project.
+
+Finora is already an existing Laravel application with database migrations and models. Authentication must be added to the existing application without recreating the project.
+
+---
+
+## 13. Dashboard
+
+Initial dashboard should provide:
 
 ```text
 Total Balance
@@ -288,7 +558,7 @@ The dashboard should focus on helping the user understand their financial situat
 
 ---
 
-## 10. Development Principles
+## 14. Development Principles
 
 1. Keep the application simple initially.
 2. Do not install unnecessary software.
@@ -298,12 +568,12 @@ The dashboard should focus on helping the user understand their financial situat
 6. User financial data must be isolated from other users.
 7. Build the MVP before adding advanced features.
 8. Prefer maintainability over unnecessary technical complexity.
+9. Review dependency changes before committing them.
+10. Keep working Git checkpoints before major development stages.
 
 ---
 
-## 11. Current Progress
-
-### Completed
+## 15. Completed Work
 
 - [x] Defined initial product concept
 - [x] Defined MVP scope
@@ -316,33 +586,74 @@ The dashboard should focus on helping the user understand their financial situat
 - [x] Decided not to update Composer
 - [x] Created Laravel project
 - [x] Confirmed Laravel 12.65.0
-
-### Current checkpoint
-
-**STOPPED HERE**
-
-The next task is:
-
-> Configure the MySQL database for Finora.
-
-Planned next steps:
-
-```text
-1. Start MySQL in Laragon
-2. Create the Finora database
-3. Configure Laravel .env
-4. Test Laravel ↔ MySQL connection
-5. Create initial migrations
-6. Design database relationships
-7. Implement authentication
-8. Build accounts
-9. Build transactions
-10. Build dashboard
-```
+- [x] Started MySQL in Laragon
+- [x] Created `finora` database in phpMyAdmin
+- [x] Configured Laravel `.env` for MySQL
+- [x] Verified Laravel → MySQL connection
+- [x] Ran initial Laravel migrations
+- [x] Created Account model and migration
+- [x] Created Category model and migration
+- [x] Created Transaction model and migration
+- [x] Designed database relationships
+- [x] Ran Finora migrations successfully
+- [x] Verified tables in phpMyAdmin
+- [x] Added Eloquent model relationships
+- [x] Verified models using Tinker
+- [x] Connected project to GitHub
+- [x] Created database/model Git checkpoint
+- [x] Pushed database/model checkpoint to GitHub
+- [x] Installed Livewire 4.4.0
+- [x] Committed and pushed Livewire checkpoint
+- [x] Installed Laravel Fortify 1.38.0 locally
 
 ---
 
-## 12. Important Note for Future Sessions
+## 16. Current Checkpoint
+
+**STOPPED HERE**
+
+The current local state is:
+
+```text
+Finora
+Laravel 12.65.0
+PHP 8.2.29
+MySQL 8.0.30
+Composer 2.4.1
+Livewire 4.4.0
+Fortify 1.38.0
+```
+
+GitHub is currently at:
+
+```text
+8d46b73 — Install Livewire
+```
+
+Fortify is installed locally but is **not yet committed or pushed**.
+
+### Immediate next steps
+
+When development resumes:
+
+```text
+1. Check git status
+2. Review composer.json / composer.lock changes
+3. Commit Laravel Fortify
+4. Push Fortify checkpoint to GitHub
+5. Configure Fortify
+6. Build authentication views using Livewire/Blade
+7. Test registration
+8. Test login/logout
+9. Verify authenticated user isolation
+10. Build Accounts module
+```
+
+Do not assume authentication is complete until these steps have been implemented and tested.
+
+---
+
+## 17. Important Note for Future Sessions
 
 When continuing development, first read this file.
 
@@ -354,8 +665,16 @@ Laravel 12.65.0
 PHP 8.2.29
 MySQL 8.0.30
 Composer 2.4.1
+Livewire 4.4.0
+Laravel Fortify 1.38.0
 ```
 
-Do not assume packages, tools, or configuration have changed unless they are explicitly updated.
+**Do not upgrade Composer.**
 
-**Next immediate task: MySQL database setup.**
+**Do not recreate the Laravel project.**
+
+**Do not assume packages, tools, or configuration have changed unless they are explicitly updated.**
+
+The next immediate task is:
+
+> **Commit and push the locally installed Laravel Fortify dependency, then configure authentication.**
